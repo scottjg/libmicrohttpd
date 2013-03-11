@@ -2648,6 +2648,40 @@ close_all_connections (struct MHD_Daemon *daemon)
   MHD_cleanup_connections (daemon);
 }
 
+/**
+ * Shutdown http daemon listening sockets.
+ *
+ * Allows clients to continue processing, but stops accepting connections
+ *
+ * @param daemon daemon to stop
+ */
+void
+MHD_quiesce_daemon (struct MHD_Daemon *daemon)
+{
+  int i, fd;
+
+  if (NULL == daemon)
+    return;
+
+  /*
+   * replace existing listening sockets with dummy sockets so event loops
+   * can continue operating normally. MHD_stop_daemon () will terminate the
+   * clients and finish cleanup.
+   */
+  fd = daemon->socket_fd;
+  daemon->socket_fd = create_socket (PF_INET, SOCK_STREAM, 0);
+  close(fd);
+  if (NULL != daemon->worker_pool)
+    {
+      /* MHD_USE_NO_LISTEN_SOCKET disables thread pools, hence we need to check */
+      for (i = 0; i < daemon->worker_pool_size; ++i)
+        {
+          fd = daemon->worker_pool[i].socket_fd;
+          daemon->worker_pool[i].socket_fd = create_socket (PF_INET, SOCK_STREAM, 0);
+        }
+    }
+}
+
 
 /**
  * Shutdown an http daemon
