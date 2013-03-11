@@ -1108,6 +1108,17 @@ MHD_stop_daemon (struct MHD_Daemon *daemon);
 
 
 /**
+ * Shutdown http daemon listening sockets.
+ *
+ * Allows clients to continue processing, but stops accepting connections
+ *
+ * @param daemon daemon to stop
+ */
+void
+MHD_quiesce_daemon (struct MHD_Daemon *daemon);
+
+
+/**
  * Add another client connection to the set of connections 
  * managed by MHD.  This API is usually not needed (since
  * MHD will accept inbound connections on the server socket).
