@@ -1723,7 +1723,7 @@ MHD_select_thread (void *cls)
 {
   struct MHD_Daemon *daemon = cls;
 
-  while (MHD_YES != daemon->shutdown)
+  while (MHD_YES != daemon->shutdown && MHD_YES != daemon->quiesce)
     {
       if (0 == (daemon->options & MHD_USE_POLL)) 
 	MHD_select (daemon, MHD_YES);
@@ -1787,6 +1787,7 @@ MHD_quiesce_daemon (struct MHD_Daemon *daemon)
   if (NULL != daemon->worker_pool)
     for (i = 0; i < daemon->worker_pool_size; i++)        
       daemon->worker_pool[i].socket_fd = -1;    
+  daemon->quiesce = MHD_YES;
   daemon->socket_fd = -1;
   return ret;
 }

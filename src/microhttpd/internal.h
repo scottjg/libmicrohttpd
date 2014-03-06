@@ -934,6 +934,11 @@ struct MHD_Daemon
   int wpipe[2];
 
   /**
+   * Are we quiescing?
+   */
+  int quiesce;
+
+  /**
    * Are we shutting down?
    */
   int shutdown;
