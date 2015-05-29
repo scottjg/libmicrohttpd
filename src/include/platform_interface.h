@@ -127,7 +127,7 @@
 /* MHD_pipe_ create pipe (!MHD_DONT_USE_PIPES) /
  *           create two connected sockets (MHD_DONT_USE_PIPES) */
 #ifndef MHD_DONT_USE_PIPES
-#define MHD_pipe_(fdarr) pipe((fdarr))
+#define MHD_pipe_(fdarr) pipe2((fdarr), O_CLOEXEC)
 #else /* MHD_DONT_USE_PIPES */
 #if !defined(_WIN32) || defined(__CYGWIN__)
 #define MHD_pipe_(fdarr) socketpair(AF_LOCAL, SOCK_STREAM, 0, (fdarr))
