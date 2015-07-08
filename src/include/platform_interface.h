@@ -127,7 +127,7 @@
 /* MHD_pipe_ create pipe (!MHD_DONT_USE_PIPES) /
  *           create two connected sockets (MHD_DONT_USE_PIPES) */
 #ifndef MHD_DONT_USE_PIPES
-#ifdef pipe2
+#ifdef __linux__
 #define MHD_pipe_(fdarr) pipe2((fdarr), O_CLOEXEC)
 #else
 #define MHD_pipe_(fdarr) pipe((fdarr))
