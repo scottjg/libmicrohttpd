@@ -9,7 +9,6 @@
 /* Define if MS VC compiler is used */
 #define MSVC 1
 
-
 /* *** MHD configuration *** */
 /* Undef to disable feature */
 
@@ -40,6 +39,16 @@
 /* define to use W32 threads */
 #define MHD_USE_W32_THREADS 1
 
+#ifndef _WIN32_WINNT
+/* MHD supports Windows XP and later W32 systems*/
+#define _WIN32_WINNT 0x0501
+#endif /* _WIN32_WINNT */
+
+/* winsock poll is available only on Vista and later */
+#if _WIN32_WINNT >= 0x0600
+#define HAVE_POLL 1
+#endif /* _WIN32_WINNT >= 0x0600 */
+
 /* define to 0 to disable epoll support */
 #define EPOLL_SUPPORT 0
 
@@ -60,6 +69,9 @@
 /* Define to 1 if you have the declaration of `TCP_NOPUSH', and to 0 if you
    don't. */
 #define HAVE_DECL_TCP_NOPUSH 0
+
+/* Define to 1 if you have the `_lseeki64' function. */
+#define HAVE___LSEEKI64 1
 
 
 /* *** Headers information *** */

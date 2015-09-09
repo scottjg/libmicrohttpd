@@ -1,6 +1,6 @@
 /*
   This file is part of libmicrohttpd
-  (C) 2014 Karlson2k (Evgeny Grin)
+  Copyright (C) 2014 Karlson2k (Evgeny Grin)
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -31,8 +31,8 @@
 #include "w32functions.h"
 #endif
 
-/* ***************************** 
-     General function mapping 
+/* *****************************
+     General function mapping
    *****************************/
 #if !defined(_WIN32) || defined(__CYGWIN__)
 /**
@@ -80,16 +80,36 @@
 #endif
 
 
+/**
+ * _MHD_socket_funcs_size is type used to specify size for send and recv
+ * functions
+ */
+#if !defined(MHD_WINSOCK_SOCKETS)
+typedef size_t _MHD_socket_funcs_size;
+#else
+typedef int _MHD_socket_funcs_size;
+#endif
 
-/* MHD_socket_close_(fd) close any FDs (non-W32) / close only socket FDs (W32) */
-#if !defined(_WIN32) || defined(__CYGWIN__)
-#define MHD_socket_close_(fd) close((fd))
+/**
+ * MHD_socket_close_(fd) close any FDs (non-W32) / close only socket
+ * FDs (W32).  Note that on HP-UNIX, this function may leak the FD if
+ * errno is set to EINTR.  Do not use HP-UNIX.
+ *
+ * @param fd descriptor to close
+ * @return 0 on success (error codes like EINTR and EIO are counted as success,
+ *           only EBADF counts as an error!)
+ */
+#if !defined(MHD_WINSOCK_SOCKETS)
+#define MHD_socket_close_(fd) (((0 != close(fd)) && (EBADF == errno)) ? -1 : 0)
 #else
 #define MHD_socket_close_(fd) closesocket((fd))
 #endif
 
-/* MHD_socket_errno_ is errno of last function (non-W32) / errno of last socket function (W32) */
-#if !defined(_WIN32) || defined(__CYGWIN__)
+/**
+ * MHD_socket_errno_ is errno of last function (non-W32) / errno of
+ * last socket function (W32)
+ */
+#if !defined(MHD_WINSOCK_SOCKETS)
 #define MHD_socket_errno_ errno
 #else
 #define MHD_socket_errno_ MHD_W32_errno_from_winsock_()
@@ -97,21 +117,21 @@
 
 /* MHD_socket_last_strerr_ is description string of last errno (non-W32) /
  *                            description string of last socket error (W32) */
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(MHD_WINSOCK_SOCKETS)
 #define MHD_socket_last_strerr_() strerror(errno)
 #else
 #define MHD_socket_last_strerr_() MHD_W32_strerror_last_winsock_()
 #endif
 
 /* MHD_strerror_ is strerror (both non-W32/W32) */
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(MHD_WINSOCK_SOCKETS)
 #define MHD_strerror_(errnum) strerror((errnum))
 #else
 #define MHD_strerror_(errnum) MHD_W32_strerror_((errnum))
 #endif
 
 /* MHD_set_socket_errno_ set errno to errnum (non-W32) / set socket last error to errnum (W32) */
-#if !defined(_WIN32) || defined(__CYGWIN__)
+#if !defined(MHD_WINSOCK_SOCKETS)
 #define MHD_set_socket_errno_(errnum) errno=(errnum)
 #else
 #define MHD_set_socket_errno_(errnum) MHD_W32_set_last_winsock_error_((errnum))
@@ -123,6 +143,15 @@
 #else
 #define MHD_SYS_select_(n,r,w,e,t) select((int)0,(r),(w),(e),(t))
 #endif
+
+#if defined(HAVE_POLL)
+/* MHD_sys_poll_ is wrapper macro for system poll() function */
+#if !defined(MHD_WINSOCK_SOCKETS)
+#define MHD_sys_poll_ poll
+#else  /* MHD_WINSOCK_SOCKETS */
+#define MHD_sys_poll_ WSAPoll
+#endif /* MHD_WINSOCK_SOCKETS */
+#endif /* HAVE_POLL */
 
 /* MHD_pipe_ create pipe (!MHD_DONT_USE_PIPES) /
  *           create two connected sockets (MHD_DONT_USE_PIPES) */
@@ -336,4 +365,4 @@ typedef pthread_mutex_t MHD_mutex_;
   ((NULL != (mutex)) ? (LeaveCriticalSection((mutex)), MHD_YES) : MHD_NO)
 #endif
 
-#endif // MHD_PLATFORM_INTERFACE_H
+#endif /* MHD_PLATFORM_INTERFACE_H */

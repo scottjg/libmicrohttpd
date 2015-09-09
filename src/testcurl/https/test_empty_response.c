@@ -1,6 +1,6 @@
 /*
  This file is part of libmicrohttpd
- (C) 2013 Christian Grothoff
+ Copyright (C) 2013 Christian Grothoff
 
  libmicrohttpd is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published
@@ -14,8 +14,8 @@
 
  You should have received a copy of the GNU General Public License
  along with libmicrohttpd; see the file COPYING.  If not, write to the
- Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- Boston, MA 02111-1307, USA.
+ Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -99,7 +99,7 @@ testInternalSelectGet ()
   curl_easy_setopt (c, CURLOPT_WRITEFUNCTION, &copyBuffer);
   curl_easy_setopt (c, CURLOPT_WRITEDATA, &cbc);
   /* TLS options */
-  curl_easy_setopt (c, CURLOPT_SSLVERSION, CURL_SSLVERSION_SSLv3);
+  curl_easy_setopt (c, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1);
   curl_easy_setopt (c, CURLOPT_SSL_CIPHER_LIST, aes256_sha);
   curl_easy_setopt (c, CURLOPT_SSL_VERIFYPEER, 0);
   curl_easy_setopt (c, CURLOPT_SSL_VERIFYHOST, 0);

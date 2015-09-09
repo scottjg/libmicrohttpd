@@ -1,6 +1,6 @@
 /*
      This file is part of libmicrohttpd
-     (C) 2007 Daniel Pittman and Christian Grothoff
+     Copyright (C) 2007 Daniel Pittman and Christian Grothoff
 
      This library is free software; you can redistribute it and/or
      modify it under the terms of the GNU Lesser General Public
@@ -170,26 +170,5 @@ MHD_http_unescape (char *val)
   return wpos - val; /* = strlen(val) */
 }
 
-
-/**
- * Equivalent to time(NULL) but tries to use some sort of monotonic
- * clock that isn't affected by someone setting the system real time
- * clock.
- *
- * @return 'current' time
- */
-time_t
-MHD_monotonic_time (void)
-{
-#ifdef HAVE_CLOCK_GETTIME
-#ifdef CLOCK_MONOTONIC
-  struct timespec ts;
-
-  if (0 == clock_gettime (CLOCK_MONOTONIC, &ts))
-    return ts.tv_sec;
-#endif
-#endif
-  return time (NULL);
-}
 
 /* end of internal.c */

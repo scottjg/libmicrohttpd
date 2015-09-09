@@ -1,6 +1,6 @@
 /*
      This file is part of libmicrohttpd
-     (C) 2010, 2011, 2012 Daniel Pittman and Christian Grothoff
+     Copyright (C) 2010, 2011, 2012, 2015 Daniel Pittman and Christian Grothoff
 
      This library is free software; you can redistribute it and/or
      modify it under the terms of the GNU Lesser General Public
@@ -26,6 +26,7 @@
 #include <limits.h>
 #include "internal.h"
 #include "md5.h"
+#include "mhd_mono_clock.h"
 
 #if defined(_WIN32) && defined(MHD_W32_MUTEX_)
 #ifndef WIN32_LEAN_AND_MEAN
@@ -35,6 +36,12 @@
 #endif /* _WIN32 && MHD_W32_MUTEX_ */
 
 #define HASH_MD5_HEX_LEN (2 * MD5_DIGEST_SIZE)
+/* 32 bit value is 4 bytes */
+#define TIMESTAMP_BIN_SIZE 4
+#define TIMESTAMP_HEX_LEN (2 * TIMESTAMP_BIN_SIZE)
+
+/* Standard server nonce length, not including terminating null */
+#define NONCE_STD_LEN (HASH_MD5_HEX_LEN + TIMESTAMP_HEX_LEN)
 
 /**
  * Beginning string for any valid Digest authentication header.
@@ -75,9 +82,9 @@ cvthex (const unsigned char *bin,
   for (i = 0; i < len; ++i)
     {
       j = (bin[i] >> 4) & 0x0f;
-      hex[i * 2] = j <= 9 ? (j + '0') : (j + 'a' - 10);
+      hex[i * 2] = (char)((j <= 9) ? (j + '0') : (j - 10 + 'a'));
       j = bin[i] & 0x0f;
-      hex[i * 2 + 1] = j <= 9 ? (j + '0') : (j + 'a' - 10);
+      hex[i * 2 + 1] = (char)((j <= 9) ? (j + '0') : (j - 10 + 'a'));
     }
   hex[len * 2] = '\0';
 }
@@ -102,26 +109,26 @@ digest_calc_ha1 (const char *alg,
 		 const char *password,
 		 const char *nonce,
 		 const char *cnonce,
-		 char *sessionkey)
+		 char sessionkey[HASH_MD5_HEX_LEN + 1])
 {
   struct MD5Context md5;
   unsigned char ha1[MD5_DIGEST_SIZE];
 
   MD5Init (&md5);
-  MD5Update (&md5, username, strlen (username));
-  MD5Update (&md5, ":", 1);
-  MD5Update (&md5, realm, strlen (realm));
-  MD5Update (&md5, ":", 1);
-  MD5Update (&md5, password, strlen (password));
+  MD5Update (&md5, (const unsigned char*)username, strlen (username));
+  MD5Update (&md5, (const unsigned char*)":", 1);
+  MD5Update (&md5, (const unsigned char*)realm, strlen (realm));
+  MD5Update (&md5, (const unsigned char*)":", 1);
+  MD5Update (&md5, (const unsigned char*)password, strlen (password));
   MD5Final (ha1, &md5);
   if (MHD_str_equal_caseless_(alg, "md5-sess"))
     {
       MD5Init (&md5);
-      MD5Update (&md5, ha1, sizeof (ha1));
-      MD5Update (&md5, ":", 1);
-      MD5Update (&md5, nonce, strlen (nonce));
-      MD5Update (&md5, ":", 1);
-      MD5Update (&md5, cnonce, strlen (cnonce));
+      MD5Update (&md5, (const unsigned char*)ha1, sizeof (ha1));
+      MD5Update (&md5, (const unsigned char*)":", 1);
+      MD5Update (&md5, (const unsigned char*)nonce, strlen (nonce));
+      MD5Update (&md5, (const unsigned char*)":", 1);
+      MD5Update (&md5, (const unsigned char*)cnonce, strlen (cnonce));
       MD5Final (ha1, &md5);
     }
   cvthex (ha1, sizeof (ha1), sessionkey);
@@ -142,7 +149,7 @@ digest_calc_ha1 (const char *alg,
  * @param response request-digest or response-digest
  */
 static void
-digest_calc_response (const char *ha1,
+digest_calc_response (const char ha1[HASH_MD5_HEX_LEN + 1],
 		      const char *nonce,
 		      const char *noncecount,
 		      const char *cnonce,
@@ -150,7 +157,7 @@ digest_calc_response (const char *ha1,
 		      const char *method,
 		      const char *uri,
 		      const char *hentity,
-		      char *response)
+		      char response[HASH_MD5_HEX_LEN + 1])
 {
   struct MD5Context md5;
   unsigned char ha2[MD5_DIGEST_SIZE];
@@ -158,9 +165,9 @@ digest_calc_response (const char *ha1,
   char ha2hex[HASH_MD5_HEX_LEN + 1];
 
   MD5Init (&md5);
-  MD5Update (&md5, method, strlen(method));
-  MD5Update (&md5, ":", 1);
-  MD5Update (&md5, uri, strlen(uri));
+  MD5Update (&md5, (const unsigned char*)method, strlen(method));
+  MD5Update (&md5, (const unsigned char*)":", 1);
+  MD5Update (&md5, (const unsigned char*)uri, strlen(uri));
 #if 0
   if (0 == strcasecmp(qop, "auth-int"))
     {
@@ -175,22 +182,22 @@ digest_calc_response (const char *ha1,
   cvthex (ha2, MD5_DIGEST_SIZE, ha2hex);
   MD5Init (&md5);
   /* calculate response */
-  MD5Update (&md5, ha1, HASH_MD5_HEX_LEN);
-  MD5Update (&md5, ":", 1);
-  MD5Update (&md5, nonce, strlen(nonce));
-  MD5Update (&md5, ":", 1);
+  MD5Update (&md5, (const unsigned char*)ha1, HASH_MD5_HEX_LEN);
+  MD5Update (&md5, (const unsigned char*)":", 1);
+  MD5Update (&md5, (const unsigned char*)nonce, strlen(nonce));
+  MD5Update (&md5, (const unsigned char*)":", 1);
   if ('\0' != *qop)
     {
-      MD5Update (&md5, noncecount, strlen(noncecount));
-      MD5Update (&md5, ":", 1);
-      MD5Update (&md5, cnonce, strlen(cnonce));
-      MD5Update (&md5, ":", 1);
-      MD5Update (&md5, qop, strlen(qop));
-      MD5Update (&md5, ":", 1);
+      MD5Update (&md5, (const unsigned char*)noncecount, strlen(noncecount));
+      MD5Update (&md5, (const unsigned char*)":", 1);
+      MD5Update (&md5, (const unsigned char*)cnonce, strlen(cnonce));
+      MD5Update (&md5, (const unsigned char*)":", 1);
+      MD5Update (&md5, (const unsigned char*)qop, strlen(qop));
+      MD5Update (&md5, (const unsigned char*)":", 1);
     }
-  MD5Update (&md5, ha2hex, HASH_MD5_HEX_LEN);
+  MD5Update (&md5, (const unsigned char*)ha2hex, HASH_MD5_HEX_LEN);
   MD5Final (resphash, &md5);
-  cvthex (resphash, sizeof (resphash), response);
+  cvthex (resphash, sizeof(resphash), response);
 }
 
 
@@ -400,31 +407,31 @@ calculate_nonce (uint32_t nonce_time,
 		 size_t rnd_size,
 		 const char *uri,
 		 const char *realm,
-		 char *nonce)
+		 char nonce[NONCE_STD_LEN + 1])
 {
   struct MD5Context md5;
-  unsigned char timestamp[4];
+  unsigned char timestamp[TIMESTAMP_BIN_SIZE];
   unsigned char tmpnonce[MD5_DIGEST_SIZE];
-  char timestamphex[sizeof(timestamp) * 2 + 1];
+  char timestamphex[TIMESTAMP_HEX_LEN + 1];
 
   MD5Init (&md5);
-  timestamp[0] = (nonce_time & 0xff000000) >> 0x18;
-  timestamp[1] = (nonce_time & 0x00ff0000) >> 0x10;
-  timestamp[2] = (nonce_time & 0x0000ff00) >> 0x08;
-  timestamp[3] = (nonce_time & 0x000000ff);
-  MD5Update (&md5, timestamp, 4);
-  MD5Update (&md5, ":", 1);
-  MD5Update (&md5, method, strlen (method));
-  MD5Update (&md5, ":", 1);
+  timestamp[0] = (unsigned char)((nonce_time & 0xff000000) >> 0x18);
+  timestamp[1] = (unsigned char)((nonce_time & 0x00ff0000) >> 0x10);
+  timestamp[2] = (unsigned char)((nonce_time & 0x0000ff00) >> 0x08);
+  timestamp[3] = (unsigned char)((nonce_time & 0x000000ff));
+  MD5Update (&md5, timestamp, sizeof(timestamp));
+  MD5Update (&md5, (const unsigned char*)":", 1);
+  MD5Update (&md5, (const unsigned char*)method, strlen (method));
+  MD5Update (&md5, (const unsigned char*)":", 1);
   if (rnd_size > 0)
-    MD5Update (&md5, rnd, rnd_size);
-  MD5Update (&md5, ":", 1);
-  MD5Update (&md5, uri, strlen (uri));
-  MD5Update (&md5, ":", 1);
-  MD5Update (&md5, realm, strlen (realm));
+    MD5Update (&md5, (const unsigned char*)rnd, rnd_size);
+  MD5Update (&md5, (const unsigned char*)":", 1);
+  MD5Update (&md5, (const unsigned char*)uri, strlen (uri));
+  MD5Update (&md5, (const unsigned char*)":", 1);
+  MD5Update (&md5, (const unsigned char*)realm, strlen (realm));
   MD5Final (tmpnonce, &md5);
   cvthex (tmpnonce, sizeof (tmpnonce), nonce);
-  cvthex (timestamp, 4, timestamphex);
+  cvthex (timestamp, sizeof(timestamp), timestamphex);
   strncat (nonce, timestamphex, 8);
 }
 
@@ -472,8 +479,8 @@ test_header (struct MHD_Connection *connection,
  *
  * @param connection connections with headers to compare against
  * @param args argument URI string (after "?" in URI)
- * @return MHD_YES if the arguments match,
- *         MHD_NO if not
+ * @return #MHD_YES if the arguments match,
+ *         #MHD_NO if not
  */
 static int
 check_argument_match (struct MHD_Connection *connection,
@@ -508,7 +515,10 @@ check_argument_match (struct MHD_Connection *connection,
 						 connection,
 						 argp);
 	  if (MHD_YES != test_header (connection, argp, NULL))
-	    return MHD_NO;
+      {
+        free(argb);
+        return MHD_NO;
+      }
 	  num_headers++;
 	  break;
 	}
@@ -527,10 +537,16 @@ check_argument_match (struct MHD_Connection *connection,
 					     connection,
 					     equals);
       if (! test_header (connection, argp, equals))
-	return MHD_NO;
+      {
+          free(argb);
+          return MHD_NO;
+      }
+      
       num_headers++;
       argp = amper;
     }
+    
+  free(argb);
 
   /* also check that the number of headers matches */
   for (pos = connection->headers_received; NULL != pos; pos = pos->next)
@@ -576,7 +592,7 @@ MHD_digest_auth_check (struct MHD_Connection *connection,
   const char *hentity = NULL; /* "auth-int" is not supported */
   char ha1[HASH_MD5_HEX_LEN + 1];
   char respexp[HASH_MD5_HEX_LEN + 1];
-  char noncehashexp[HASH_MD5_HEX_LEN + 9];
+  char noncehashexp[NONCE_STD_LEN + 1];
   uint32_t nonce_time;
   uint32_t t;
   size_t left; /* number of characters left in 'header' for 'uri' */
@@ -632,10 +648,82 @@ MHD_digest_auth_check (struct MHD_Connection *connection,
        header value. */
     return MHD_NO;
   }
+  nonce_time = strtoul (nonce + len - TIMESTAMP_HEX_LEN, (char **)NULL, 16);
+  t = (uint32_t) MHD_monotonic_sec_counter();
+  /*
+   * First level vetting for the nonce validity: if the timestamp
+   * attached to the nonce exceeds `nonce_timeout', then the nonce is
+   * invalid.
+   */
+  if ( (t > nonce_time + nonce_timeout) ||
+       (nonce_time + nonce_timeout < nonce_time) )
+    {
+      /* too old */
+      return MHD_INVALID_NONCE;
+    }
+
+  calculate_nonce (nonce_time,
+                   connection->method,
+                   connection->daemon->digest_auth_random,
+                   connection->daemon->digest_auth_rand_size,
+                   connection->url,
+                   realm,
+                   noncehashexp);
+  /*
+   * Second level vetting for the nonce validity
+   * if the timestamp attached to the nonce is valid
+   * and possibly fabricated (in case of an attack)
+   * the attacker must also know the random seed to be
+   * able to generate a "sane" nonce, which if he does
+   * not, the nonce fabrication process going to be
+   * very hard to achieve.
+   */
+
+  if (0 != strcmp (nonce, noncehashexp))
+    {
+      return MHD_INVALID_NONCE;
+    }
+  if ( (0 == lookup_sub_value (cnonce,
+                               sizeof (cnonce),
+                               header, "cnonce")) ||
+       (0 == lookup_sub_value (qop, sizeof (qop), header, "qop")) ||
+       ( (0 != strcmp (qop, "auth")) &&
+         (0 != strcmp (qop, "")) ) ||
+       (0 == lookup_sub_value (nc, sizeof (nc), header, "nc"))  ||
+       (0 == lookup_sub_value (response, sizeof (response), header, "response")) )
+    {
+#if HAVE_MESSAGES
+      MHD_DLOG (connection->daemon,
+		"Authentication failed, invalid format.\n");
+#endif
+      return MHD_NO;
+    }
+  nci = strtoul (nc, &end, 16);
+  if ( ('\0' != *end) ||
+       ( (LONG_MAX == nci) &&
+         (ERANGE == errno) ) )
+    {
+#if HAVE_MESSAGES
+      MHD_DLOG (connection->daemon,
+		"Authentication failed, invalid format.\n");
+#endif
+      return MHD_NO; /* invalid nonce format */
+    }
+  /*
+   * Checking if that combination of nonce and nc is sound
+   * and not a replay attack attempt. Also adds the nonce
+   * to the nonce-nc map if it does not exist there.
+   */
+
+  if (MHD_YES != check_nonce_nc (connection, nonce, nci))
+    {
+      return MHD_NO;
+    }
+
   {
     char *uri;
-    
-    uri = malloc(left + 1);
+
+    uri = malloc (left + 1);
     if (NULL == uri)
     {
 #if HAVE_MESSAGES
@@ -648,113 +736,7 @@ MHD_digest_auth_check (struct MHD_Connection *connection,
                                left + 1,
                                header, "uri"))
     {
-      free(uri);
-      return MHD_NO;
-    }
-
-    /* 8 = 4 hexadecimal numbers for the timestamp */
-    nonce_time = strtoul (nonce + len - 8, (char **)NULL, 16);
-    t = (uint32_t) MHD_monotonic_time();
-    /*
-     * First level vetting for the nonce validity: if the timestamp
-     * attached to the nonce exceeds `nonce_timeout', then the nonce is
-     * invalid.
-     */
-    if ( (t > nonce_time + nonce_timeout) ||
-	 (nonce_time + nonce_timeout < nonce_time) )
-    { 
-      free(uri);
-      return MHD_INVALID_NONCE;
-    }
-    if (0 != strncmp (uri,
-		      connection->url,
-		      strlen (connection->url)))
-    {
-#if HAVE_MESSAGES
-      MHD_DLOG (connection->daemon,
-		"Authentication failed, URI does not match.\n");
-#endif
-      free(uri);
-      return MHD_NO;
-    }
-    {
-      const char *args = strchr (uri, '?');
-
-      if (NULL == args)
-	args = "";
-      else
-	args++;
-      if (MHD_YES !=
-	  check_argument_match (connection,
-				args) )
-      {
-#if HAVE_MESSAGES
-	MHD_DLOG (connection->daemon,
-		  "Authentication failed, arguments do not match.\n");
-#endif
-       free(uri);
-       return MHD_NO;
-      }
-    }
-    calculate_nonce (nonce_time,
-		     connection->method,
-		     connection->daemon->digest_auth_random,
-		     connection->daemon->digest_auth_rand_size,
-		     connection->url,
-		     realm,
-		     noncehashexp);
-    /*
-     * Second level vetting for the nonce validity
-     * if the timestamp attached to the nonce is valid
-     * and possibly fabricated (in case of an attack)
-     * the attacker must also know the random seed to be
-     * able to generate a "sane" nonce, which if he does
-     * not, the nonce fabrication process going to be
-     * very hard to achieve.
-     */
-
-    if (0 != strcmp (nonce, noncehashexp))
-    {
-      free(uri);
-      return MHD_INVALID_NONCE;
-    }
-    if ( (0 == lookup_sub_value (cnonce,
-				 sizeof (cnonce),
-				 header, "cnonce")) ||
-	 (0 == lookup_sub_value (qop, sizeof (qop), header, "qop")) ||
-	 ( (0 != strcmp (qop, "auth")) &&
-	   (0 != strcmp (qop, "")) ) ||
-	 (0 == lookup_sub_value (nc, sizeof (nc), header, "nc"))  ||
-	 (0 == lookup_sub_value (response, sizeof (response), header, "response")) )
-    {
-#if HAVE_MESSAGES
-      MHD_DLOG (connection->daemon,
-		"Authentication failed, invalid format.\n");
-#endif
-      free(uri);
-      return MHD_NO;
-    }
-    nci = strtoul (nc, &end, 16);
-    if ( ('\0' != *end) ||
-	 ( (LONG_MAX == nci) &&
-	   (ERANGE == errno) ) )
-    {
-#if HAVE_MESSAGES
-      MHD_DLOG (connection->daemon,
-		"Authentication failed, invalid format.\n");
-#endif
-      free(uri);
-      return MHD_NO; /* invalid nonce format */
-    }
-    /*
-     * Checking if that combination of nonce and nc is sound
-     * and not a replay attack attempt. Also adds the nonce
-     * to the nonce-nc map if it does not exist there.
-     */
-
-    if (MHD_YES != check_nonce_nc (connection, nonce, nci))
-    {
-      free(uri);
+      free (uri);
       return MHD_NO;
     }
 
@@ -774,7 +756,43 @@ MHD_digest_auth_check (struct MHD_Connection *connection,
 			  uri,
 			  hentity,
 			  respexp);
-    free(uri);
+
+    /* Need to unescape URI before comparing with connection->url */
+    connection->daemon->unescape_callback (connection->daemon->unescape_callback_cls,
+                                           connection,
+                                           uri);
+    if (0 != strncmp (uri,
+		      connection->url,
+		      strlen (connection->url)))
+    {
+#if HAVE_MESSAGES
+      MHD_DLOG (connection->daemon,
+		"Authentication failed, URI does not match.\n");
+#endif
+      free (uri);
+      return MHD_NO;
+    }
+
+    {
+      const char *args = strchr (uri, '?');
+
+      if (NULL == args)
+	args = "";
+      else
+	args++;
+      if (MHD_YES !=
+	  check_argument_match (connection,
+				args) )
+      {
+#if HAVE_MESSAGES
+	MHD_DLOG (connection->daemon,
+		  "Authentication failed, arguments do not match.\n");
+#endif
+       free (uri);
+       return MHD_NO;
+      }
+    }
+    free (uri);
     return (0 == strcmp(response, respexp))
       ? MHD_YES
       : MHD_NO;
@@ -805,10 +823,10 @@ MHD_queue_auth_fail_response (struct MHD_Connection *connection,
 {
   int ret;
   size_t hlen;
-  char nonce[HASH_MD5_HEX_LEN + 9];
+  char nonce[NONCE_STD_LEN + 1];
 
   /* Generating the server nonce */
-  calculate_nonce ((uint32_t) MHD_monotonic_time(),
+  calculate_nonce ((uint32_t) MHD_monotonic_sec_counter(),
 		   connection->method,
 		   connection->daemon->digest_auth_random,
 		   connection->daemon->digest_auth_rand_size,
@@ -835,7 +853,7 @@ MHD_queue_auth_fail_response (struct MHD_Connection *connection,
 		   : "");
   {
     char *header;
-    
+
     header = malloc(hlen + 1);
     if (NULL == header)
     {

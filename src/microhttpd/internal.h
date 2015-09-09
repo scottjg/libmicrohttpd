@@ -1,6 +1,6 @@
 /*
   This file is part of libmicrohttpd
-  (C) 2007-2013 Daniel Pittman and Christian Grothoff
+  Copyright (C) 2007-2015 Daniel Pittman and Christian Grothoff
 
   This library is free software; you can redistribute it and/or
   modify it under the terms of the GNU Lesser General Public
@@ -51,8 +51,8 @@
  */
 #define EXTRA_CHECKS MHD_NO
 
-#define MHD_MAX(a,b) ((a)<(b)) ? (b) : (a)
-#define MHD_MIN(a,b) ((a)<(b)) ? (a) : (b)
+#define MHD_MAX(a,b) (((a)<(b)) ? (b) : (a))
+#define MHD_MIN(a,b) (((a)<(b)) ? (a) : (b))
 
 
 /**
@@ -78,6 +78,8 @@ extern void *mhd_panic_cls;
 /* If we have Clang or gcc >= 4.5, use __buildin_unreachable() */
 #if defined(__clang__) || (__GNUC__ > 4) || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
 #define BUILTIN_NOT_REACHED __builtin_unreachable()
+#elif defined(_MSC_FULL_VER)
+#define BUILTIN_NOT_REACHED __assume(0)
 #else
 #define BUILTIN_NOT_REACHED
 #endif
@@ -295,7 +297,7 @@ struct MHD_Response
   /**
    * Offset to start reading from when using @e fd.
    */
-  off_t fd_off;
+  uint64_t fd_off;
 
   /**
    * Number of bytes ready in @e data (buffer may be larger
@@ -487,8 +489,10 @@ MHD_state_to_string (enum MHD_CONNECTION_STATE state);
  * @param max_bytes maximum number of bytes to receive
  * @return number of bytes written to write_to
  */
-typedef ssize_t (*ReceiveCallback) (struct MHD_Connection * conn,
-                                    void *write_to, size_t max_bytes);
+typedef ssize_t
+(*ReceiveCallback) (struct MHD_Connection *conn,
+                    void *write_to,
+                    size_t max_bytes);
 
 
 /**
@@ -499,8 +503,10 @@ typedef ssize_t (*ReceiveCallback) (struct MHD_Connection * conn,
  * @param max_bytes maximum number of bytes to transmit
  * @return number of bytes transmitted
  */
-typedef ssize_t (*TransmitCallback) (struct MHD_Connection * conn,
-                                     const void *write_to, size_t max_bytes);
+typedef ssize_t
+(*TransmitCallback) (struct MHD_Connection *conn,
+                     const void *write_to,
+                     size_t max_bytes);
 
 
 /**
@@ -578,12 +584,21 @@ struct MHD_Connection
   struct MemoryPool *pool;
 
   /**
-   * We allow the main application to associate some
-   * pointer with the connection.  Here is where we
-   * store it.  (MHD does not know or care what it
-   * is).
+   * We allow the main application to associate some pointer with the
+   * HTTP request, which is passed to each #MHD_AccessHandlerCallback
+   * and some other API calls.  Here is where we store it.  (MHD does
+   * not know or care what it is).
    */
   void *client_context;
+
+  /**
+   * We allow the main application to associate some pointer with the
+   * TCP connection (which may span multiple HTTP requests).  Here is
+   * where we store it.  (MHD does not know or care what it is).
+   * The location is given to the #MHD_NotifyConnectionCallback and
+   * also accessible via #MHD_CONNECTION_INFO_SOCKET_CONTEXT.
+   */
+  void *socket_context;
 
   /**
    * Request method.  Should be GET/POST/etc.  Allocated
@@ -606,7 +621,7 @@ struct MHD_Connection
   /**
    * Buffer for reading requests.   Allocated
    * in pool.  Actually one byte larger than
-   * read_buffer_size (if non-NULL) to allow for
+   * @e read_buffer_size (if non-NULL) to allow for
    * 0-termination.
    */
   char *read_buffer;
@@ -620,7 +635,8 @@ struct MHD_Connection
   /**
    * Last incomplete header line during parsing of headers.
    * Allocated in pool.  Only valid if state is
-   * either HEADER_PART_RECEIVED or FOOTER_PART_RECEIVED.
+   * either #MHD_CONNECTION_HEADER_PART_RECEIVED or
+   * #MHD_CONNECTION_FOOTER_PART_RECEIVED.
    */
   char *last;
 
@@ -628,12 +644,13 @@ struct MHD_Connection
    * Position after the colon on the last incomplete header
    * line during parsing of headers.
    * Allocated in pool.  Only valid if state is
-   * either HEADER_PART_RECEIVED or FOOTER_PART_RECEIVED.
+   * either #MHD_CONNECTION_HEADER_PART_RECEIVED or
+   * #MHD_CONNECTION_FOOTER_PART_RECEIVED.
    */
   char *colon;
 
   /**
-   * Foreign address (of length addr_len).  MALLOCED (not
+   * Foreign address (of length @e addr_len).  MALLOCED (not
    * in pool!).
    */
   struct sockaddr *addr;
@@ -664,7 +681,7 @@ struct MHD_Connection
   size_t write_buffer_size;
 
   /**
-   * Offset where we are with sending from write_buffer.
+   * Offset where we are with sending from @e write_buffer.
    */
   size_t write_buffer_send_offset;
 
@@ -676,7 +693,7 @@ struct MHD_Connection
 
   /**
    * How many more bytes of the body do we expect
-   * to read? MHD_SIZE_UNKNOWN for unknown.
+   * to read? #MHD_SIZE_UNKNOWN for unknown.
    */
   uint64_t remaining_upload_size;
 
@@ -800,17 +817,17 @@ struct MHD_Connection
   /**
    * Handler used for processing read connection operations
    */
-  int (*read_handler) (struct MHD_Connection * connection);
+  int (*read_handler) (struct MHD_Connection *connection);
 
   /**
    * Handler used for processing write connection operations
    */
-  int (*write_handler) (struct MHD_Connection * connection);
+  int (*write_handler) (struct MHD_Connection *connection);
 
   /**
    * Handler used for processing idle connection operations
    */
-  int (*idle_handler) (struct MHD_Connection * connection);
+  int (*idle_handler) (struct MHD_Connection *connection);
 
   /**
    * Function used for reading HTTP request stream.
@@ -864,9 +881,10 @@ struct MHD_Connection
  * @param con connection handle
  * @return new closure
  */
-typedef void * (*LogCallback)(void * cls,
-			      const char * uri,
-			      struct MHD_Connection *con);
+typedef void *
+(*LogCallback)(void * cls,
+               const char * uri,
+               struct MHD_Connection *con);
 
 /**
  * Signature of function called to unescape URIs.  See also
@@ -877,9 +895,10 @@ typedef void * (*LogCallback)(void * cls,
  * @param uri 0-terminated string to unescape (should be updated)
  * @return length of the resulting string
  */
-typedef size_t (*UnescapeCallback)(void *cls,
-				   struct MHD_Connection *conn,
-				   char *uri);
+typedef size_t
+(*UnescapeCallback)(void *cls,
+                    struct MHD_Connection *conn,
+                    char *uri);
 
 
 /**
@@ -998,6 +1017,17 @@ struct MHD_Daemon
    * Closure argument to notify_completed.
    */
   void *notify_completed_cls;
+
+  /**
+   * Function to call when we are starting/stopping
+   * a connection.  May be NULL.
+   */
+  MHD_NotifyConnectionCallback notify_connection;
+
+  /**
+   * Closure argument to notify_connection.
+   */
+  void *notify_connection_cls;
 
   /**
    * Function to call with the full URI at the
@@ -1155,9 +1185,9 @@ struct MHD_Daemon
   unsigned int per_ip_connection_limit;
 
   /**
-   * Daemon's options.
+   * Daemon's flags (bitfield).
    */
-  enum MHD_OPTION options;
+  enum MHD_FLAG options;
 
   /**
    * Listen port.
@@ -1203,6 +1233,11 @@ struct MHD_Daemon
    * Pointer to our SSL/TLS certificate (in ASCII) in memory.
    */
   const char *https_mem_cert;
+
+  /**
+   * Pointer to 0-terminated HTTPS passphrase in memory.
+   */
+  const char *https_key_password;
 
   /**
    * Pointer to our SSL/TLS certificate authority (in ASCII) in memory.
@@ -1401,17 +1436,6 @@ struct MHD_Daemon
     (element)->nextE->prevE = (element)->prevE; \
   (element)->nextE = NULL; \
   (element)->prevE = NULL; } while (0)
-
-
-/**
- * Equivalent to `time(NULL)` but tries to use some sort of monotonic
- * clock that isn't affected by someone setting the system real time
- * clock.
- *
- * @return 'current' time
- */
-time_t
-MHD_monotonic_time(void);
 
 
 /**

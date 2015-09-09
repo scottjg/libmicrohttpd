@@ -1,6 +1,6 @@
 /*
  This file is part of libmicrohttpd
- (C) 2007 Christian Grothoff
+ Copyright (C) 2007 Christian Grothoff
 
  libmicrohttpd is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published
@@ -14,8 +14,8 @@
 
  You should have received a copy of the GNU General Public License
  along with libmicrohttpd; see the file COPYING.  If not, write to the
- Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- Boston, MA 02111-1307, USA.
+ Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ Boston, MA 02110-1301, USA.
  */
 
 /**
@@ -188,8 +188,8 @@ test_hello_extension (gnutls_session_t session, extensions_t exten_t,
     }
 
 cleanup:
-  if (sd != -1)
-    close (sd);
+  if (-1 != sd)
+    MHD_socket_close_ (sd);
   gnutls_free (cbc.buf);
   return ret;
 }
@@ -206,7 +206,7 @@ main (int argc, char *const *argv)
   gnutls_datum_t cert;
   gnutls_certificate_credentials_t xcred;
 
-  const int ext_arr[] = { 
+  const int ext_arr[] = {
     GNUTLS_EXTENSION_SERVER_NAME,
     -1
   };

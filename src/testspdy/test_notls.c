@@ -1,6 +1,6 @@
 /*
     This file is part of libmicrospdy
-    Copyright (C) 2012 Andrey Uzunov
+    Copyright Copyright (C) 2012 Andrey Uzunov
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -488,7 +488,7 @@ static int connect_to(const char *host, uint16_t port)
     if(rv == 0) {
       break;
     }
-    close(fd);
+    MHD_socket_close_(fd);
     fd = -1;
     dief("connect", strerror(errno));
   }
@@ -661,7 +661,7 @@ static void fetch_uri(const struct URI *uri)
   /* Resource cleanup */
   spdylay_session_del(connection.session);
   shutdown(fd, SHUT_WR);
-  close(fd);
+  MHD_socket_close_(fd);
   request_free(&req);
 }
 

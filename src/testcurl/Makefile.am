@@ -1,3 +1,4 @@
+# This Makefile.am is in the public domain
 SUBDIRS  = .
 
 if USE_COVERAGE
@@ -17,6 +18,7 @@ $(LIBCURL_CPPFLAGS)
 
 if !HAVE_W32
 PERF_GET_CONCURRENT=perf_get_concurrent
+TEST_CONCURRENT_STOP=test_concurrent_stop
 if HAVE_CURL_BINARY
 CURL_FORK_TEST = test_get_response_cleanup
 endif
@@ -29,6 +31,7 @@ check_PROGRAMS = \
   test_get_sendfile \
   test_urlparse \
   test_put \
+  $(TEST_CONCURRENT_STOP) \
   test_process_headers \
   test_process_arguments \
   test_parse_cookies \
@@ -83,6 +86,12 @@ test_start_stop_SOURCES = \
   test_start_stop.c
 test_start_stop_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la
+
+test_concurrent_stop_SOURCES = \
+  test_concurrent_stop.c
+test_concurrent_stop_LDADD = \
+  $(top_builddir)/src/microhttpd/libmicrohttpd.la \
+ @LIBCURL@
 
 test_options_SOURCES = \
   test_options.c
@@ -140,8 +149,12 @@ test_get_sendfile_SOURCES = \
 test_get_sendfile_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@
+test_get_sendfile_DEPENDENCIES =
+
 if HAVE_W32
 test_get_sendfile_LDADD += \
+ $(top_builddir)/src/platform/libplatform_interface.la
+test_get_sendfile_DEPENDENCIES += \
  $(top_builddir)/src/platform/libplatform_interface.la
 endif
 
@@ -221,8 +234,12 @@ test_get_sendfile11_SOURCES = \
 test_get_sendfile11_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@
+test_get_sendfile11_DEPENDENCIES =
+
 if HAVE_W32
 test_get_sendfile11_LDADD += \
+  $(top_builddir)/src/platform/libplatform_interface.la
+test_get_sendfile11_DEPENDENCIES += \
   $(top_builddir)/src/platform/libplatform_interface.la
 endif
 
@@ -291,4 +308,3 @@ test_timeout_SOURCES = \
 test_timeout_LDADD = \
   $(top_builddir)/src/microhttpd/libmicrohttpd.la \
   @LIBCURL@
-

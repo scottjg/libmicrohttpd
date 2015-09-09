@@ -1,6 +1,6 @@
 /*
      This file is part of libmicrohttpd
-     (C) 2007, 2009 Christian Grothoff
+     Copyright (C) 2007, 2009 Christian Grothoff
 
      libmicrohttpd is free software; you can redistribute it and/or modify
      it under the terms of the GNU General Public License as published
@@ -14,12 +14,11 @@
 
      You should have received a copy of the GNU General Public License
      along with libmicrohttpd; see the file COPYING.  If not, write to the
-     Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-     Boston, MA 02111-1307, USA.
+     Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+     Boston, MA 02110-1301, USA.
 */
-
 /**
- * @file daemontest_get_sendfile.c
+ * @file test_get_sendfile.c
  * @brief  Testcase for libmicrohttpd response from FD
  * @author Christian Grothoff
  */
@@ -49,7 +48,7 @@
 
 #define TESTSTR "This is the content of the test file we are sending using sendfile (if available)"
 
-char *sourcefile;
+static char *sourcefile;
 
 static int oneone;
 
@@ -59,6 +58,7 @@ struct CBC
   size_t pos;
   size_t size;
 };
+
 
 static size_t
 copyBuffer (void *ptr, size_t size, size_t nmemb, void *ctx)
@@ -162,6 +162,7 @@ testInternalGet ()
   return 0;
 }
 
+
 static int
 testMultithreadedGet ()
 {
@@ -210,6 +211,7 @@ testMultithreadedGet ()
     return 128;
   return 0;
 }
+
 
 static int
 testMultithreadedPoolGet ()
@@ -260,6 +262,7 @@ testMultithreadedPoolGet ()
     return 128;
   return 0;
 }
+
 
 static int
 testExternalGet ()
@@ -383,6 +386,7 @@ testExternalGet ()
   return 0;
 }
 
+
 static int
 testUnknownPortGet ()
 {
@@ -482,7 +486,8 @@ main (int argc, char *const *argv)
     }
   fwrite (TESTSTR, strlen (TESTSTR), 1, f);
   fclose (f);
-  oneone = NULL != strstr (argv[0], "11");
+  oneone = (NULL != strrchr (argv[0], (int) '/')) ?
+    (NULL != strstr (strrchr (argv[0], (int) '/'), "11")) : 0;
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;
   errorCount += testInternalGet ();

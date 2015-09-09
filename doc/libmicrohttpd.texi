@@ -186,7 +186,7 @@ three processes on the same machine).
 Not all combinations of thread modes and event loop styles are
 supported.  This is partially to keep the API simple, and partially
 because some combinations simply make no sense as others are strictly
-superior.  Note that the choice of style depends fist of all on the
+superior.  Note that the choice of style depends first of all on the
 application logic, and then on the performance requirements.
 Applications that perform a blocking operation while handling a
 request within the callbacks from MHD must use a thread per
@@ -268,6 +268,33 @@ specifies path to libgnutls installation
 
 
 @end table
+
+@section Validity of pointers
+
+MHD will give applications access to its internal data structures
+via pointers via arguments and return values from its API.  This
+creates the question as to how long those pointers are assured to
+stay valid.
+
+Most MHD data structures are associated with the connection of an
+HTTP client.  Thus, pointers associated with a connection are
+typically valid until the connection is finished, at which point
+MHD will call the @code{MHD_RequestCompletedCallback} if one is
+registered.  Applications that have such a callback registered
+may assume that keys and values from the
+@code{MHD_KeyValueIterator}, return values from
+@code{MHD_lookup_connection_value} and the @code{url},
+@code{method} and @code{version} arguments to the
+@code{MHD_AccessHandlerCallback} will remain valid until the
+respective @code{MHD_RequestCompletedCallback} is invoked.
+
+In contrast, the @code{upload_data} argument of
+@code{MHD_RequestCompletedCallback} as well as all pointers
+from the @code{MHD_PostDataIterator} are only valid for the
+duration of the callback.
+
+Pointers returned from @code{MHD_get_response_header} are
+valid as long as the response itself is valid.
 
 
 @section Including the microhttpd.h header
@@ -460,9 +487,9 @@ production.
 @cindex FD_SETSIZE
 @cindex poll
 @cindex select
-Use poll instead of select. This allows sockets with descriptors
-@code{>= FD_SETSIZE}.  This option currently only works in conjunction
-with @code{MHD_USE_THREAD_PER_CONNECTION} or
+Use @code{poll()} instead of @code{select()}. This allows sockets with
+descriptors @code{>= FD_SETSIZE}.  This option currently only works in
+conjunction with @code{MHD_USE_THREAD_PER_CONNECTION} or
 @code{MHD_USE_INTERNAL_SELECT} (at this point).  If you specify
 @code{MHD_USE_POLL} and the local platform does not support it,
 @code{MHD_start_daemon} will return NULL.
@@ -471,15 +498,16 @@ with @code{MHD_USE_THREAD_PER_CONNECTION} or
 @cindex FD_SETSIZE
 @cindex epoll
 @cindex select
-Use epoll instead of poll or select. This allows sockets with
-descriptors @code{>= FD_SETSIZE}.  This option is only available on
-Linux systems and only works in conjunction with
+Use @code{epoll()} instead of @code{poll()} or @code{select()}. This
+allows sockets with descriptors @code{>= FD_SETSIZE}.  This option is
+only available on Linux systems and does not work in conjunction with
 @code{MHD_USE_THREAD_PER_CONNECTION} (at this point).  If you specify
 @code{MHD_USE_EPOLL_LINUX_ONLY} and the local platform does not
-support it, @code{MHD_start_daemon} will return NULL.  Using epoll
-instead of select or poll can in some situations result in significantly
-higher performance as the system call has fundamentally lower complexity
-(O(1) for epoll vs. O(n) for select/poll where n is the number of
+support it, @code{MHD_start_daemon} will return NULL.  Using
+@code{epoll()} instead of @code{select()} or @code{poll()} can in some
+situations result in significantly higher performance as the system
+call has fundamentally lower complexity (O(1) for @code{epoll()}
+vs. O(n) for @code{select()}/@code{poll()} where n is the number of
 open connections).
 
 @item MHD_SUPPRESS_DATE_NO_CLOCK
@@ -604,6 +632,25 @@ pointer to a function of type @code{MHD_RequestCompletedCallback()}
 and second a pointer to a closure to pass to the request completed
 callback.  The second pointer maybe @code{NULL}.
 
+@item MHD_OPTION_NOTIFY_CONNECTION
+Register a function that should be called when the TCP connection to a
+client is opened or closed.  Note that
+@code{MHD_OPTION_NOTIFY_COMPLETED} and the @code{con_cls} argument to
+the @code{MHD_AccessHandlerCallback} are per HTTP request (and there
+can be multiple HTTP requests per TCP connection).  The registered
+callback is called twice per TCP connection, with
+@code{MHD_CONNECTION_NOTIFY_STARTED} and
+@code{MHD_CONNECTION_NOTIFY_CLOSED} respectively.  An additional
+argument can be used to store TCP connection specific information,
+which can be retrieved using @code{MHD_CONNECTION_INFO_SOCKET_CONTEXT}
+during the lifetime of the TCP connection.  The respective location is
+not the same as the HTTP-request-specific @code{con_cls} from the
+@code{MHD_AccessHandlerCallback}.
+
+This option should be followed by @strong{TWO} pointers.  First a
+pointer to a function of type @code{MHD_NotifyConnectionCallback()}
+and second a pointer to a closure to pass to the request completed
+callback.  The second pointer maybe @code{NULL}.
 
 @item MHD_OPTION_PER_IP_CONNECTION_LIMIT
 Limit on the number of (concurrent) connections made to the
@@ -660,6 +707,19 @@ Memory pointer to the private key to be used by the
 HTTPS daemon.  This option should be followed by an
 "const char*" argument.
 This should be used in conjunction with 'MHD_OPTION_HTTPS_MEM_CERT'.
+
+@item MHD_OPTION_HTTPS_KEY_PASSWORD
+@cindex SSL
+@cindex TLS
+Memory pointer to the password that decrypts the
+private key to be used by the HTTPS daemon.
+This option should be followed by an
+"const char*" argument.
+This should be used in conjunction with 'MHD_OPTION_HTTPS_MEM_KEY'.
+
+The password (or passphrase) is only used immediately during
+@code{MHD_start_daemon()}.  Thus, the application may want to
+erase it from memory afterwards for additional security.
 
 @item MHD_OPTION_HTTPS_MEM_CERT
 @cindex SSL
@@ -1103,14 +1163,14 @@ data is available, the first time the callback is
 invoked there won't be upload data, as this is done
 just after MHD parses the headers.  If supported by
 the client and the HTTP version, the application can
-at this point queue an error response to possibly 
+at this point queue an error response to possibly
 avoid the upload entirely. If no response is generated,
 MHD will (if required) automatically send a 100 CONTINUE
 reply to the client.
 
 Afterwards, POST data will be passed to the callback
 to be processed incrementally by the application. The
-application may return @code{MHD_NO} to forcefully 
+application may return @code{MHD_NO} to forcefully
 terminate the TCP connection without generating a
 proper HTTP response. Once all of the upload data has
 been provided to the application, the application
@@ -2002,7 +2062,10 @@ connection is suspended, MHD will not detect disconnects by the
 client.
 
 The only safe time to suspend a connection is from the
-@code{MHD_AccessHandlerCallback}.
+@code{MHD_AccessHandlerCallback} or from the respective
+@code{MHD_ContentReaderCallback} (but in this case the
+response object must not be shared among multiple
+connections).
 
 Finally, it is an API violation to call @code{MHD_stop_daemon} while
 having suspended connections (this will at least create memory and
@@ -2538,6 +2601,14 @@ after sending the HTTP header and clear it after finishing the footers
 automatically (if the platform supports it).  As the connection
 callbacks are invoked in between, those might be used to set different
 values for TCP-CORK and TCP-NODELAY in the meantime.
+
+@item MHD_CONNECTION_INFO_SOCKET_CONTEXT
+Returns the client-specific pointer to a @code{void *} that was
+(possibly) set during a @code{MHD_NotifyConnectionCallback} when the
+socket was first accepted.  Note that this is NOT the same as the
+@code{con_cls} argument of the @code{MHD_AccessHandlerCallback}.  The
+@code{con_cls} is fresh for each HTTP request, while the
+@code{socket_context} is fresh for each socket.
 
 @end table
 @end deftp

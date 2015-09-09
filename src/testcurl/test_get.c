@@ -1,6 +1,6 @@
 /*
      This file is part of libmicrohttpd
-     (C) 2007, 2009, 2011 Christian Grothoff
+     Copyright (C) 2007, 2009, 2011 Christian Grothoff
 
      libmicrohttpd is free software; you can redistribute it and/or modify
      it under the terms of the GNU General Public License as published
@@ -14,12 +14,12 @@
 
      You should have received a copy of the GNU General Public License
      along with libmicrohttpd; see the file COPYING.  If not, write to the
-     Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-     Boston, MA 02111-1307, USA.
+     Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+     Boston, MA 02110-1301, USA.
 */
 
 /**
- * @file daemontest_get.c
+ * @file test_get.c
  * @brief  Testcase for libmicrohttpd GET operations
  *         TODO: test parsing of query
  * @author Christian Grothoff
@@ -271,7 +271,7 @@ testExternalGet ()
   fd_set ws;
   fd_set es;
   MHD_socket max;
-  int running; 
+  int running;
   struct CURLMsg *msg;
   time_t start;
   struct timeval tv;
@@ -461,41 +461,41 @@ testStopRace (int poll_flag)
     struct sockaddr_in sin;
     MHD_socket fd;
     struct MHD_Daemon *d;
-    
+
     d = MHD_start_daemon (MHD_USE_THREAD_PER_CONNECTION | MHD_USE_DEBUG | poll_flag,
                          1081, NULL, NULL, &ahc_echo, "GET",
                          MHD_OPTION_CONNECTION_TIMEOUT, 5, MHD_OPTION_END);
     if (d == NULL)
        return 16;
-    
+
     fd = socket (PF_INET, SOCK_STREAM, 0);
     if (fd == MHD_INVALID_SOCKET)
     {
        fprintf(stderr, "socket error\n");
        return 256;
     }
-    
+
     memset(&sin, 0, sizeof(sin));
     sin.sin_family = AF_INET;
     sin.sin_port = htons(1081);
     sin.sin_addr.s_addr = htonl(0x7f000001);
-    
+
     if (connect (fd, (struct sockaddr *)(&sin), sizeof(sin)) < 0)
     {
        fprintf(stderr, "connect error\n");
        MHD_socket_close_ (fd);
        return 512;
     }
-    
+
     /*  printf("Waiting\n"); */
     /* Let the thread get going. */
     usleep(500000);
-    
+
     /* printf("Stopping daemon\n"); */
     MHD_stop_daemon (d);
- 
+
     MHD_socket_close_ (fd);
-    
+
     /* printf("good\n"); */
     return 0;
 }
@@ -606,7 +606,8 @@ main (int argc, char *const *argv)
 {
   unsigned int errorCount = 0;
 
-  oneone = NULL != strstr (argv[0], "11");
+  oneone = (NULL != strrchr (argv[0], (int) '/')) ?
+    (NULL != strstr (strrchr (argv[0], (int) '/'), "11")) : 0;
   if (0 != curl_global_init (CURL_GLOBAL_WIN32))
     return 2;
   errorCount += testInternalGet (0);
@@ -616,20 +617,22 @@ main (int argc, char *const *argv)
   errorCount += testStopRace (0);
   errorCount += testExternalGet ();
   errorCount += testEmptyGet (0);
-#ifndef WINDOWS
-  errorCount += testInternalGet (MHD_USE_POLL);
-  errorCount += testMultithreadedGet (MHD_USE_POLL);
-  errorCount += testMultithreadedPoolGet (MHD_USE_POLL);
-  errorCount += testUnknownPortGet (MHD_USE_POLL);
-  errorCount += testStopRace (MHD_USE_POLL);
-  errorCount += testEmptyGet (MHD_USE_POLL);
-#endif
-#if EPOLL_SUPPORT
-  errorCount += testInternalGet (MHD_USE_EPOLL_LINUX_ONLY);
-  errorCount += testMultithreadedPoolGet (MHD_USE_EPOLL_LINUX_ONLY);
-  errorCount += testUnknownPortGet (MHD_USE_EPOLL_LINUX_ONLY);
-  errorCount += testEmptyGet (MHD_USE_EPOLL_LINUX_ONLY);
-#endif
+  if (MHD_YES == MHD_is_feature_supported(MHD_FEATURE_POLL))
+    {
+      errorCount += testInternalGet(MHD_USE_POLL);
+      errorCount += testMultithreadedGet(MHD_USE_POLL);
+      errorCount += testMultithreadedPoolGet(MHD_USE_POLL);
+      errorCount += testUnknownPortGet(MHD_USE_POLL);
+      errorCount += testStopRace(MHD_USE_POLL);
+      errorCount += testEmptyGet(MHD_USE_POLL);
+    }
+  if (MHD_YES == MHD_is_feature_supported(MHD_FEATURE_EPOLL))
+    {
+      errorCount += testInternalGet(MHD_USE_EPOLL_LINUX_ONLY);
+      errorCount += testMultithreadedPoolGet(MHD_USE_EPOLL_LINUX_ONLY);
+      errorCount += testUnknownPortGet(MHD_USE_EPOLL_LINUX_ONLY);
+      errorCount += testEmptyGet(MHD_USE_EPOLL_LINUX_ONLY);
+    }
   if (errorCount != 0)
     fprintf (stderr, "Error (code: %u)\n", errorCount);
   curl_global_cleanup ();

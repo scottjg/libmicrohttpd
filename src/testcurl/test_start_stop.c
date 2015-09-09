@@ -1,6 +1,6 @@
 /*
      This file is part of libmicrohttpd
-     (C) 2011 Christian Grothoff
+     Copyright (C) 2011 Christian Grothoff
 
      libmicrohttpd is free software; you can redistribute it and/or modify
      it under the terms of the GNU General Public License as published
@@ -14,8 +14,8 @@
 
      You should have received a copy of the GNU General Public License
      along with libmicrohttpd; see the file COPYING.  If not, write to the
-     Free Software Foundation, Inc., 59 Temple Place - Suite 330,
-     Boston, MA 02111-1307, USA.
+     Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+     Boston, MA 02110-1301, USA.
 */
 
 /**
@@ -112,15 +112,17 @@ main (int argc, char *const *argv)
   errorCount += testMultithreadedGet (0);
   errorCount += testMultithreadedPoolGet (0);
   errorCount += testExternalGet ();
-#ifndef WINDOWS
-  errorCount += testInternalGet (MHD_USE_POLL);
-  errorCount += testMultithreadedGet (MHD_USE_POLL);
-  errorCount += testMultithreadedPoolGet (MHD_USE_POLL);
-#endif
-#if EPOLL_SUPPORT
-  errorCount += testInternalGet (MHD_USE_EPOLL_LINUX_ONLY);
-  errorCount += testMultithreadedPoolGet (MHD_USE_EPOLL_LINUX_ONLY);
-#endif
+  if (MHD_YES == MHD_is_feature_supported(MHD_FEATURE_POLL))
+    {
+      errorCount += testInternalGet(MHD_USE_POLL);
+      errorCount += testMultithreadedGet(MHD_USE_POLL);
+      errorCount += testMultithreadedPoolGet(MHD_USE_POLL);
+    }
+  if (MHD_YES == MHD_is_feature_supported(MHD_FEATURE_EPOLL))
+    {
+      errorCount += testInternalGet(MHD_USE_EPOLL_LINUX_ONLY);
+      errorCount += testMultithreadedPoolGet(MHD_USE_EPOLL_LINUX_ONLY);
+    }
   if (errorCount != 0)
     fprintf (stderr, "Error (code: %u)\n", errorCount);
   return errorCount != 0;       /* 0 == pass */

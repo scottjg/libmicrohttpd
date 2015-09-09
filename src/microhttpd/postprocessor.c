@@ -1,6 +1,6 @@
 /*
      This file is part of libmicrohttpd
-     (C) 2007-2013 Daniel Pittman and Christian Grothoff
+     Copyright (C) 2007-2013 Daniel Pittman and Christian Grothoff
 
      This library is free software; you can redistribute it and/or
      modify it under the terms of the GNU Lesser General Public
@@ -540,7 +540,7 @@ find_boundary (struct MHD_PostProcessor *pp,
     {
       if (pp->buffer_pos == pp->buffer_size)
         pp->state = PP_Error;   /* out of memory */
-      // ++(*ioffptr);
+      /* ++(*ioffptr); */
       return MHD_NO;            /* not enough data */
     }
   if ((0 != memcmp ("--", buf, 2)) || (0 != memcmp (&buf[2], boundary, blen)))

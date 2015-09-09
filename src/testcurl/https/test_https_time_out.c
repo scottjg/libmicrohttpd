@@ -1,6 +1,6 @@
 /*
  This file is part of libmicrohttpd
- (C) 2007 Christian Grothoff
+ Copyright (C) 2007 Christian Grothoff
 
  libmicrohttpd is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published
@@ -14,12 +14,12 @@
 
  You should have received a copy of the GNU General Public License
  along with libmicrohttpd; see the file COPYING.  If not, write to the
- Free Software Foundation, Inc., 59 Temple Place - Suite 330,
- Boston, MA 02111-1307, USA.
+ Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
+ Boston, MA 02110-1301, USA.
  */
 
 /**
- * @file mhds_get_test.c
+ * @file test_https_time_out.c
  * @brief: daemon TLS alert response test-case
  *
  * @author Sagie Amir
@@ -64,12 +64,12 @@ test_tls_session_time_out (gnutls_session_t session)
 
   gnutls_transport_set_ptr (session, (gnutls_transport_ptr_t) (intptr_t) sd);
 
-  ret = connect (sd, &sa, sizeof (struct sockaddr_in));
+  ret = connect (sd, (struct sockaddr *) &sa, sizeof (struct sockaddr_in));
 
   if (ret < 0)
     {
       fprintf (stderr, "Error: %s\n", MHD_E_FAILED_TO_CONNECT);
-      close (sd);
+      MHD_socket_close_ (sd);
       return -1;
     }
 
@@ -77,7 +77,7 @@ test_tls_session_time_out (gnutls_session_t session)
   if (ret < 0)
     {
       fprintf (stderr, "Handshake failed\n");
-      close (sd);
+      MHD_socket_close_ (sd);
       return -1;
     }
 
@@ -88,11 +88,11 @@ test_tls_session_time_out (gnutls_session_t session)
   if (send (sd, "", 1, 0) == 0)
     {
       fprintf (stderr, "Connection failed to time-out\n");
-      close (sd);
+      MHD_socket_close_ (sd);
       return -1;
     }
 
-  close (sd);
+  MHD_socket_close_ (sd);
   return 0;
 }
 
@@ -123,7 +123,7 @@ main (int argc, char *const *argv)
                         MHD_OPTION_HTTPS_MEM_CERT, srv_self_signed_cert_pem,
                         MHD_OPTION_END);
 
-  if (d == NULL)
+  if (NULL == d)
     {
       fprintf (stderr, MHD_E_SERVER_INIT);
       return -1;

@@ -1,6 +1,6 @@
 /*
      This file is part of libmicrohttpd
-     (C) 2007, 2008, 2010 Daniel Pittman and Christian Grothoff
+     Copyright (C) 2007, 2008, 2010 Daniel Pittman and Christian Grothoff
 
      This library is free software; you can redistribute it and/or
      modify it under the terms of the GNU Lesser General Public
@@ -28,9 +28,10 @@
 
 #include "internal.h"
 #include "connection.h"
+#include "connection_https.h"
 #include "memorypool.h"
 #include "response.h"
-#include "reason_phrase.h"
+#include "mhd_mono_clock.h"
 #include <gnutls/gnutls.h>
 
 
@@ -47,7 +48,7 @@ run_tls_handshake (struct MHD_Connection *connection)
 {
   int ret;
 
-  connection->last_activity = MHD_monotonic_time();
+  connection->last_activity = MHD_monotonic_sec_counter();
   if (connection->state == MHD_TLS_CONNECTION_INIT)
     {
       ret = gnutls_handshake (connection->tls_session);
@@ -140,7 +141,7 @@ MHD_tls_connection_handle_idle (struct MHD_Connection *connection)
             MHD_state_to_string (connection->state));
 #endif
   timeout = connection->connection_timeout;
-  if ( (timeout != 0) && (timeout <= (MHD_monotonic_time() - connection->last_activity)))
+  if ( (timeout != 0) && (timeout <= (MHD_monotonic_sec_counter() - connection->last_activity)))
     MHD_connection_close (connection,
 			  MHD_REQUEST_TERMINATED_TIMEOUT_REACHED);
   switch (connection->state)

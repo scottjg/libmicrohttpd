@@ -1,6 +1,6 @@
 /*
      This file is part of libmicrohttpd
-     (C) 2006-2014 Christian Grothoff (and other contributing authors)
+     Copyright (C) 2006-2015 Christian Grothoff (and other contributing authors)
 
      This library is free software; you can redistribute it and/or
      modify it under the terms of the GNU Lesser General Public
@@ -113,7 +113,7 @@ extern "C"
 #if defined(_MSC_FULL_VER) && !defined (_SSIZE_T_DEFINED)
 #define _SSIZE_T_DEFINED
 typedef intptr_t ssize_t;
-#endif // !_SSIZE_T_DEFINED */
+#endif /* !_SSIZE_T_DEFINED */
 #else
 #include <unistd.h>
 #include <sys/time.h>
@@ -130,7 +130,7 @@ typedef intptr_t ssize_t;
  * Current version of the library.
  * 0x01093001 = 1.9.30-1.
  */
-#define MHD_VERSION 0x00093901
+#define MHD_VERSION 0x00094211
 
 /**
  * MHD-internal return code for "YES".
@@ -194,6 +194,53 @@ typedef SOCKET MHD_socket;
 #endif /* MHD_SOCKET_DEFINED */
 
 /**
+ * Define MHD_NO_DEPRECATION before including "microhttpd.h" to disable deprecation messages
+ */
+#ifdef MHD_NO_DEPRECATION
+#define _MHD_DEPR_MACRO(msg)
+#define _MHD_DEPR_FUNC(msg)
+#endif /* MHD_NO_DEPRECATION */
+
+#ifndef _MHD_DEPR_MACRO
+#if defined(_MSC_FULL_VER) && _MSC_VER+0 >= 1500
+/* Stringify macros */
+#define _MHD_INSTRMACRO(a) #a
+#define _MHD_STRMACRO(a) _MHD_INSTRMACRO(a)
+#define _MHD_DEPR_MACRO(msg) __pragma(message(__FILE__ "(" _MHD_STRMACRO(__LINE__)"): warning: " msg))
+#elif defined(__clang__) || defined (__GNUC_PATCHLEVEL__)
+#define _MHD_GCC_PRAG(x) _Pragma (#x)
+#if __clang_major__+0 >= 5 || \
+  (!defined(__apple_build_version__) && (__clang_major__+0  > 3 || (__clang_major__+0 == 3 && __clang_minor__ >= 3))) || \
+  __GNUC__+0 > 4 || (__GNUC__+0 == 4 && __GNUC_MINOR__+0 >= 8)
+#define _MHD_DEPR_MACRO(msg) _MHD_GCC_PRAG(GCC warning msg)
+#else /* older clang or GCC */
+#define _MHD_DEPR_MACRO(msg) _MHD_GCC_PRAG(message msg)
+#endif
+/* #elif defined(SOMEMACRO) */ /* add compiler-specific macros here if required */
+#else /* other compilers */
+#define _MHD_DEPR_MACRO(msg)
+#endif
+#endif /* _MHD_DEPR_MACRO */
+
+#ifndef _MHD_DEPR_FUNC
+#if defined(_MSC_FULL_VER) && _MSC_VER+0 >= 1400
+#define _MHD_DEPR_FUNC(msg) __declspec(deprecated(msg))
+#elif defined(_MSC_FULL_VER) && _MSC_VER+0 >= 1310
+/* VS .NET 2003 deprecation do not support custom messages */
+#define _MHD_DEPR_FUNC(msg) __declspec(deprecated)
+#elif defined (__clang__) && \
+  (__clang_major__+0 >= 4 || (!defined(__apple_build_version__) && __clang_major__+0 >= 3))
+#define _MHD_DEPR_FUNC(msg) __attribute__((deprecated(msg)))
+#elif defined (__clang__) || __GNUC__+0 > 3 || (__GNUC__+0 == 3 && __GNUC_MINOR__+0 >= 1)
+/* GCC-style deprecation do not support custom messages */
+#define _MHD_DEPR_FUNC(msg) __attribute__((__deprecated__))
+/* #elif defined(SOMEMACRO) */ /* add compiler-specific macros here if required */
+#else /* other compilers */
+#define _MHD_DEPR_FUNC(msg)
+#endif
+#endif /* _MHD_DEPR_FUNC */
+
+/**
  * Not all architectures and `printf()`'s support the `long long` type.
  * This gives the ability to replace `long long` with just a `long`,
  * standard `int` or a `short`.
@@ -204,6 +251,8 @@ typedef SOCKET MHD_socket;
  */
 #define MHD_LONG_LONG long long
 #define MHD_UNSIGNED_LONG_LONG unsigned long long
+#else /* MHD_LONG_LONG */
+_MHD_DEPR_MACRO("Macro MHD_LONG_LONG is deprecated, use MHD_UNSIGNED_LONG_LONG")
 #endif
 /**
  * Format string for printing a variable of type #MHD_LONG_LONG.
@@ -215,6 +264,8 @@ typedef SOCKET MHD_socket;
  */
 #define MHD_LONG_LONG_PRINTF "ll"
 #define MHD_UNSIGNED_LONG_LONG_PRINTF "%llu"
+#else /* MHD_LONG_LONG_PRINTF */
+_MHD_DEPR_MACRO("Macro MHD_LONG_LONG_PRINTF is deprecated, use MHD_UNSIGNED_LONG_LONG_PRINTF")
 #endif
 
 
@@ -253,7 +304,8 @@ typedef SOCKET MHD_socket;
 #define MHD_HTTP_METHOD_NOT_ALLOWED 405
 #define MHD_HTTP_NOT_ACCEPTABLE 406
 /** @deprecated */
-#define MHD_HTTP_METHOD_NOT_ACCEPTABLE 406
+#define MHD_HTTP_METHOD_NOT_ACCEPTABLE \
+  _MHD_DEPR_MACRO("Value MHD_HTTP_METHOD_NOT_ACCEPTABLE is deprecated, use MHD_HTTP_NOT_ACCEPTABLE") 406
 #define MHD_HTTP_PROXY_AUTHENTICATION_REQUIRED 407
 #define MHD_HTTP_REQUEST_TIMEOUT 408
 #define MHD_HTTP_CONFLICT 409
@@ -287,6 +339,16 @@ typedef SOCKET MHD_socket;
 #define MHD_HTTP_NOT_EXTENDED 510
 
 /** @} */ /* end of group httpcode */
+
+/**
+ * Returns the string reason phrase for a response code.
+ *
+ * If we don't have a string for a status code, we give the first
+ * message in that status code class.
+ */
+const char *
+MHD_get_reason_phrase_for (unsigned int code);
+
 
 /**
  * Flag to be or-ed with MHD_HTTP status code for
@@ -354,6 +416,7 @@ typedef SOCKET MHD_socket;
 #define MHD_HTTP_HEADER_WARNING "Warning"
 #define MHD_HTTP_HEADER_WWW_AUTHENTICATE "WWW-Authenticate"
 #define MHD_HTTP_HEADER_ACCESS_CONTROL_ALLOW_ORIGIN "Access-Control-Allow-Origin"
+#define MHD_HTTP_HEADER_CONTENT_DISPOSITION "Content-Disposition"
 
 /** @} */ /* end of group headers */
 
@@ -380,6 +443,7 @@ typedef SOCKET MHD_socket;
 #define MHD_HTTP_METHOD_OPTIONS "OPTIONS"
 #define MHD_HTTP_METHOD_POST "POST"
 #define MHD_HTTP_METHOD_PUT "PUT"
+#define MHD_HTTP_METHOD_PATCH "PATCH"
 #define MHD_HTTP_METHOD_TRACE "TRACE"
 
 /** @} */ /* end of group methods */
@@ -517,7 +581,8 @@ enum MHD_FLAG
   /**
    * Use `epoll()` instead of `select()` or `poll()` for the event loop.
    * This option is only available on Linux; using the option on
-   * non-Linux systems will cause #MHD_start_daemon to fail.
+   * non-Linux systems will cause #MHD_start_daemon to fail.  Using
+   * this option is not supported with MHD_USE_THREAD_PER_CONNECTION.
    */
   MHD_USE_EPOLL_LINUX_ONLY = 512,
 
@@ -863,6 +928,27 @@ enum MHD_OPTION
    * This option must be followed by a `unsigned int` argument.
    */
   MHD_OPTION_LISTENING_ADDRESS_REUSE = 25,
+
+  /**
+   * Memory pointer for a password that decrypts the private key (key.pem)
+   * to be used by the HTTPS daemon. This option should be followed by a
+   * `const char *` argument.
+   * This should be used in conjunction with #MHD_OPTION_HTTPS_MEM_KEY.
+   * @sa ::MHD_FEATURE_HTTPS_KEY_PASSWORD
+   */
+  MHD_OPTION_HTTPS_KEY_PASSWORD = 26,
+
+  /**
+   * Register a function that should be called whenever a connection is
+   * started or closed.
+   *
+   * This option should be followed by TWO pointers.  First a pointer
+   * to a function of type #MHD_NotifyConnectionCallback and second a
+   * pointer to a closure to pass to the request completed callback.
+   * The second pointer maybe NULL.
+   */
+  MHD_OPTION_NOTIFY_CONNECTION = 27
+
 };
 
 
@@ -997,6 +1083,29 @@ enum MHD_RequestTerminationCode
 
 
 /**
+ * The `enum MHD_ConnectionNotificationCode` specifies types
+ * of connection notifications.
+ * @ingroup request
+ */
+enum MHD_ConnectionNotificationCode
+{
+
+  /**
+   * A new connection has been started.
+   * @ingroup request
+   */
+  MHD_CONNECTION_NOTIFY_STARTED = 0,
+
+  /**
+   * A connection is closed.
+   * @ingroup request
+   */
+  MHD_CONNECTION_NOTIFY_CLOSED = 1
+
+};
+
+
+/**
  * Information about a connection.
  */
 union MHD_ConnectionInfo
@@ -1037,6 +1146,12 @@ union MHD_ConnectionInfo
    * daemons running).
    */
   struct MHD_Daemon *daemon;
+
+  /**
+   * Socket-specific client context.  Points to the same address as
+   * the "socket_context" of the #MHD_NotifyConnectionCallback.
+   */
+  void **socket_context;
 };
 
 
@@ -1095,7 +1210,17 @@ enum MHD_ConnectionInfoType
    * No extra arguments should be passed.
    * @ingroup request
    */
-  MHD_CONNECTION_INFO_CONNECTION_FD
+  MHD_CONNECTION_INFO_CONNECTION_FD,
+
+  /**
+   * Returns the client-specific pointer to a `void *` that was (possibly)
+   * set during a #MHD_NotifyConnectionCallback when the socket was
+   * first accepted.  Note that this is NOT the same as the "con_cls"
+   * argument of the #MHD_AccessHandlerCallback.  The "con_cls" is
+   * fresh for each HTTP request, while the "socket_context" is fresh
+   * for each socket.
+   */
+  MHD_CONNECTION_INFO_SOCKET_CONTEXT
 
 };
 
@@ -1233,6 +1358,31 @@ typedef void
                                  struct MHD_Connection *connection,
                                  void **con_cls,
                                  enum MHD_RequestTerminationCode toe);
+
+/**
+ * Signature of the callback used by MHD to notify the
+ * application about started/stopped connections
+ *
+ * @param cls client-defined closure
+ * @param connection connection handle
+ * @param socket_context socket-specific pointer where the
+ *                       client can associate some state specific
+ *                       to the TCP connection; note that this is
+ *                       different from the "con_cls" which is per
+ *                       HTTP request.  The client can initialize
+ *                       during #MHD_CONNECTION_NOTIFY_STARTED and
+ *                       cleanup during #MHD_CONNECTION_NOTIFY_CLOSED
+ *                       and access in the meantime using
+ *                       #MHD_CONNECTION_INFO_SOCKET_CONTEXT.
+ * @param toe reason for connection notification
+ * @see #MHD_OPTION_NOTIFY_CONNECTION
+ * @ingroup request
+ */
+typedef void
+(*MHD_NotifyConnectionCallback) (void *cls,
+                                 struct MHD_Connection *connection,
+                                 void **socket_context,
+                                 enum MHD_ConnectionNotificationCode toe);
 
 
 /**
@@ -1867,6 +2017,7 @@ MHD_create_response_from_callback (uint64_t size,
  * @deprecated use #MHD_create_response_from_buffer instead
  * @ingroup response
  */
+_MHD_DEPR_FUNC("MHD_create_response_from_data() is deprecated, use MHD_create_response_from_buffer()") \
 _MHD_EXTERN struct MHD_Response *
 MHD_create_response_from_data (size_t size,
 			       void *data,
@@ -1939,7 +2090,25 @@ MHD_create_response_from_buffer (size_t size,
  */
 _MHD_EXTERN struct MHD_Response *
 MHD_create_response_from_fd (size_t size,
-			     int fd);
+                               int fd);
+
+
+/**
+ * Create a response object.  The response object can be extended with
+ * header information and then be used any number of times.
+ *
+ * @param size size of the data portion of the response;
+ *        sizes larger than 2 GiB may be not supported by OS or
+ *        MHD build; see ::MHD_FEATURE_LARGE_FILE
+ * @param fd file descriptor referring to a file on disk with the
+ *        data; will be closed when response is destroyed;
+ *        fd should be in 'blocking' mode
+ * @return NULL on error (i.e. invalid arguments, out of memory)
+ * @ingroup response
+ */
+_MHD_EXTERN struct MHD_Response *
+MHD_create_response_from_fd64 (uint64_t size,
+                               int fd);
 
 
 /**
@@ -1958,10 +2127,39 @@ MHD_create_response_from_fd (size_t size,
  * @return NULL on error (i.e. invalid arguments, out of memory)
  * @ingroup response
  */
+_MHD_DEPR_FUNC("Function MHD_create_response_from_fd_at_offset() is deprecated, use MHD_create_response_from_fd_at_offset64()") \
 _MHD_EXTERN struct MHD_Response *
 MHD_create_response_from_fd_at_offset (size_t size,
-				       int fd,
-				       off_t offset);
+                                       int fd,
+                                       off_t offset);
+
+/* Substitute MHD_create_response_from_fd_at_offset64() instead of MHD_create_response_from_fd_at_offset()
+   to minimize possible problems with different off_t options */
+#define MHD_create_response_from_fd_at_offset(size,fd,offset) \
+  _MHD_DEPR_MACRO("Usage of MHD_create_response_from_fd_at_offset() is deprecated, use MHD_create_response_from_fd_at_offset64()") \
+  MHD_create_response_from_fd_at_offset64((size),(fd),(offset))
+
+
+/**
+ * Create a response object.  The response object can be extended with
+ * header information and then be used any number of times.
+ *
+ * @param size size of the data portion of the response;
+ *        sizes larger than 2 GiB may be not supported by OS or
+ *        MHD build; see ::MHD_FEATURE_LARGE_FILE
+ * @param fd file descriptor referring to a file on disk with the
+ *        data; will be closed when response is destroyed;
+ *        fd should be in 'blocking' mode
+ * @param offset offset to start reading from in the file;
+ *        reading file beyond 2 GiB may be not supported by OS or
+ *        MHD build; see ::MHD_FEATURE_LARGE_FILE
+ * @return NULL on error (i.e. invalid arguments, out of memory)
+ * @ingroup response
+ */
+_MHD_EXTERN struct MHD_Response *
+MHD_create_response_from_fd_at_offset64 (uint64_t size,
+                                         int fd,
+                                         uint64_t offset);
 
 
 #if 0
@@ -2553,7 +2751,24 @@ enum MHD_FEATURE
    * #MHD_destroy_post_processor() can
    * be used.
    */
-  MHD_FEATURE_POSTPROCESSOR = 13
+  MHD_FEATURE_POSTPROCESSOR = 13,
+
+  /**
+  * Get whether password encrypted private key for HTTPS daemon is
+  * supported. If supported then option
+  * ::MHD_OPTION_HTTPS_KEY_PASSWORD can be used.
+  */
+  MHD_FEATURE_HTTPS_KEY_PASSWORD = 14,
+
+  /**
+   * Get whether reading files beyond 2 GiB boundary is supported.
+   * If supported then #MHD_create_response_from_fd(),
+   * #MHD_create_response_from_fd64 #MHD_create_response_from_fd_at_offset()
+   * and #MHD_create_response_from_fd_at_offset64() can be used with sizes and
+   * offsets larger than 2 GiB. If not supported value of size+offset is
+   * limited to 2 GiB.
+   */
+  MHD_FEATURE_LARGE_FILE = 15
 };
 
 

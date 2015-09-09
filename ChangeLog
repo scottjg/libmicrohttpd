@@ -1,3 +1,155 @@
+Wed Sep  2 16:50:31 CEST 2015
+ 	Call resume_suspended_connections() when the user is running
+	its own mainloop and calls MHD_run_from_select() to support
+	resuming connections with external select. -FC
+	
+Sun Aug 30 14:53:51 CEST 2015
+	Correct documentation as to when MHD_USE_EPOLL_LINUX_ONLY
+	is allowed. -CG
+
+Thu Aug 27 09:38:44 CEST 2015
+	Reimplement monotonic clock functions for better
+	support various platforms.
+	Print more information during configure. -EG
+
+Fri Aug 14 14:13:55 CEST 2015
+	Export MHD_get_reason_phrase_for() symbol. -CG
+
+Sat Aug  8 12:19:47 CEST 2015
+	Added checks for overflows and buffer overruns, fixed
+	possible buffer overrun.
+	Updated md5 implementation.
+	Fixed many compiler warning (mostly for VC compiler). -EG
+
+Tue Aug  4 13:50:23 CEST 2015
+	Fix failure to properly clean up timed out connections
+	if running in external select mode without listen socket,
+	which caused busy waiting until new connections arrived.
+	(Fixes #3924, thanks to slimp for reporting and testcase). -CG
+
+Sun Aug  2 19:08:20 CEST 2015
+	Ignore close() errors on sockets except for EBADF,
+	fixes #3926. -CG
+
+Sat Jun 27 22:16:27 CEST 2015
+	Make sure to decrement connection counter before
+	calling connection notifier so that
+	MHD_DAEMON_INFO_CURRENT_CONNECTIONS does not
+	present stale information (relevant if this is
+	used for termination detection of a daemon
+	stopped via MHD_quiesce_daemon()). Thanks to
+	Markus Doppelbauer for reporting. -CG
+
+Fri Jun 26 23:17:20 CEST 2015
+	Fix (automatic) handling of HEAD requests with
+	MHD_create_response_from_callback() and HTTP/1.1
+	connection keep-alives. Thanks to Cristian Klein
+	for reporting. -CG
+
+Tue Jun 09 18:30:17 CEST 2015
+	Add new functions MHD_create_response_from_fd64() and
+	MHD_create_response_from_fd_at_offset64(). -EG
+
+Thu Jun  4 13:37:05 CEST 2015
+	Fixing memory leak in digest authentication. -AW
+
+Wed Jun 03 21:23:47 CEST 2015
+	Add deprecation compiler messages for deprecated functions
+	and macros. -EG
+
+Fri May 29 12:23:01 CEST 2015
+	Fixing digest authentication when used in combination
+	with escaped characters in URLs. -CG/AW
+
+Wed May 13 11:49:09 CEST 2015
+	Releasing libmicrohttpd 0.9.42. -CG
+
+Wed May 13 11:33:59 CEST 2015
+	Fix off-by-one in MHD_start_daemon_va() error handling logic
+	when initialization of threads for thread pool fails for some
+	reason. -CG/JC
+
+Thu May  7 17:05:46 CEST 2015
+	Add support for poll() in W32. -EG
+
+Wed May  6 18:07:38 CEST 2015
+	Fix #3784: actually implement MHD_CONNECTION_INFO_SOCKET_CONTEXT. -asherkin
+
+Thu Apr 30 00:03::49 CEST 2015
+	Releasing libmicrohttpd 0.9.41. -CG
+
+Thu Apr 30 00:02:33 CEST 2015
+	Fix issue where resumed connections would not continue
+	unless other requests are active in certain
+	event-loop modes. Thanks to Mike Castillo for reporting. -CG
+
+Wed Apr 15 03:16:18 CEST 2015
+	Fixing issue #3753 (testcase issue). -CG
+
+Wed Apr 15 00:30:34 CEST 2015
+	Fix looping issue when using MHD_USE_POLL_INTERNALLY
+	and a client times out. -LB
+
+Sun Apr 12 21:48:50 CEST 2015
+	Fix looping issue when combining MHD_USE_EPOLL_LINUX_ONLY
+	with HTTPS and slow clients. -CG
+
+Fri Apr 10 22:02:27 CEST 2015
+	Fix logic to add "Connection: Close" that was broken in 0.9.38
+	when adding MHD_RF_HTTP_VERSION_1_0_ONLY. -CG
+
+Fri Apr 10 00:38:40 CEST 2015
+	Ensure fast termination in MHD_USE_THREAD_PER_CONNECTION
+	mode on W32 by using signal pipe. -CG
+
+Thu Apr  9 09:01:15 CEST 2015
+	Fixing issue with undrained signal pipe when using
+	MHD_USE_SELECT_INTERNALLY and MHD_USE_POLL in combination
+	with MHD_resume_connection(), causing 100% CPU usage. -DD
+
+Tue Apr  7 00:12:36 CEST 2015
+	Releasing libmicrohttpd 0.9.40. -CG
+
+Sat Apr  4 18:28:24 CEST 2015
+	Fix potential deadlock issue in MHD_USE_THREAD_PER_CONNECTION
+	mode if shutdown is initiated while connections are active. -CG
+
+Sat Apr  4 17:48:13 CEST 2015
+	Fix issue in thread-pool mode where a MHD_stop_daemon()
+	might not reach threads that stopped listening because
+	we hit the maximum number of concurrent connections and
+	the option MHD_USE_PIPE_FOR_SHUTDOWN was also not used.
+	Testcase added as well. -CG
+
+Fri Apr  3 12:55:31 CEST 2015
+	Update HTTPS testcases to avoid SSLv3, as SSLv3 is dead.
+
+Fri Apr  3 12:25:28 CEST 2015
+	Do not enforce FD_SETSIZE-limit on worker control
+	pipe when using MHD_USE_EPOLL_LINUX_ONLY (#3751). -MH/CG
+
+Tue Mar 31 10:28:26 CEST 2015
+	Adding MHD_OPTION_NOTIFY_CONNECTION,
+	MHD_CONNECTION_NOTIFY_STARTED,
+	MHD_CONNECTION_NOTIFY_CLOSED and
+	MHD_CONNECTION_INFO_SOCKET_CONTEXT to allow
+	applications to trigger operations when TCP
+	connections start or end, instead of just
+	exposing HTTP requests starting and ending. -RG/CG
+
+Thu Feb 26 09:55:43 CET 2015
+	Fixing bug that prevented MHD_OPTION_HTTPS_MEM_DHPARAMS
+	from working within a MHD_OPTION_ARRAY. -DD
+
+Sun Feb  8 01:24:38 CET 2015
+	Adding MHD_OPTION_HTTPS_KEY_PASSWORD as proposed by
+	Andrew Basile. -CG/AB
+
+Wed Feb  4 20:34:22 CET 2015
+	Fix issue where for HTTP/1.0-clients that set
+	Connection: Keep-Alive header a response of
+	indefinite size was generated with chunked encoding. -CG
+
 Sun Jan 18 20:09:06 CET 2015
 	Fix potential infinite loop on shutdown in multi-threaded mode
 	under certain conditions. -CG
